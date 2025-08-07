@@ -15,6 +15,14 @@ from trade_reasoning_logger import TradeReasoningLogger
 from alpha_ranking import calc_asset_alpha
 import matplotlib.pyplot as plt
 
+# Import Alpaca execution functions for stock trading
+try:
+    from alpaca_execution import buy_stock, sell_stock
+    ALPACA_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Alpaca integration not available: {e}")
+    ALPACA_AVAILABLE = False
+
 if __name__ == "main.py":
     print("🚀 Starting AI Trading Bot...")
     main.py()
@@ -219,6 +227,66 @@ for ticker, market_type in assets_list:
                 confidence=adj_confidence,
                 notes="Executed on Kraken"
             )
+    elif MODE == "LIVE" and market_type == "stock" and allocated > 0:
+        if not ALPACA_AVAILABLE:
+            print("⚠️ Alpaca integration not available. Stock trade will not execute.")
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action="SKIP",
+                strategy=strategy,
+                signal=signal,
+                sentiment=sentiment,
+                market_regime=regime,
+                confidence=adj_confidence,
+                notes="Alpaca integration not available"
+            )
+        elif not os.getenv("ALPACA_API_KEY") or not os.getenv("ALPACA_SECRET_KEY"):
+            print("⚠️ Alpaca API keys not set. Stock trade will not execute.")
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action="SKIP",
+                strategy=strategy,
+                signal=signal,
+                sentiment=sentiment,
+                market_regime=regime,
+                confidence=adj_confidence,
+                notes="Missing Alpaca API keys"
+            )
+        else:
+            # Execute stock trade using Alpaca
+            if signal == "buy":
+                order_result = buy_stock(ticker, int(allocated))
+            elif signal == "sell":
+                order_result = sell_stock(ticker, int(allocated))
+            else:
+                order_result = None
+            
+            if order_result:
+                trade_reasoning_logger.log_reason(
+                    date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                    ticker=ticker,
+                    action=signal.upper(),
+                    strategy=strategy,
+                    signal=signal,
+                    sentiment=sentiment,
+                    market_regime=regime,
+                    confidence=adj_confidence,
+                    notes="Executed on Alpaca"
+                )
+            else:
+                trade_reasoning_logger.log_reason(
+                    date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                    ticker=ticker,
+                    action="FAILED",
+                    strategy=strategy,
+                    signal=signal,
+                    sentiment=sentiment,
+                    market_regime=regime,
+                    confidence=adj_confidence,
+                    notes="Alpaca order failed"
+                )
     else:
         trade_reasoning_logger.log_reason(
             date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
@@ -231,32 +299,6 @@ for ticker, market_type in assets_list:
             confidence=adj_confidence,
             notes="Simulated execution"
         )
-        import os
-from alpaca_trade_api.rest import REST, TimeFrame
-
-def place_order_alpaca(symbol, side, qty, trade_logger=None):
-    api = REST(
-        os.getenv("ALPACA_API_KEY"),
-        os.getenv("ALPACA_API_SECRET"),
-        base_url='https://paper-api.alpaca.markets'  # Use paper trading endpoint
-    )
-    order = api.submit_order(
-        symbol=symbol,
-        qty=qty,
-        side=side,  # 'buy' or 'sell'
-        type='market',
-        time_in_force='gtc'
-    )
-    print(f"Alpaca order placed: {side} {qty} shares of {symbol} (order id: {order.id})")
-    if trade_logger:
-        trade_logger.log_trade(
-            # Fill in with your actual trade logger params
-            symbol=symbol,
-            action=side.upper(),
-            qty=qty,
-            # ... (more fields as needed)
-        )
-    return order
 
     portfolio.execute_trade(ticker, signal, price, allocated)
     memory.record_result(ticker, strategy, "win")
