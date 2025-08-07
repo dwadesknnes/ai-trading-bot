@@ -15,9 +15,9 @@ from trade_reasoning_logger import TradeReasoningLogger
 from alpha_ranking import calc_asset_alpha
 import matplotlib.pyplot as plt
 
-if __name__ == "__main__":
+if __name__ == "main.py":
     print("🚀 Starting AI Trading Bot...")
-    main()
+    main.py()
 
 # --- ASSET DISCOVERY ---
 try:
