@@ -15,6 +15,8 @@ from trade_reasoning_logger import TradeReasoningLogger
 from alpha_ranking import calc_asset_alpha
 import matplotlib.pyplot as plt
 
+print("🚀 Starting AI Trading Bot...")
+
 # --- ASSET DISCOVERY ---
 try:
     from screener import get_top_stocks, get_top_crypto
@@ -266,3 +268,5 @@ if os.path.exists("trades.csv") and os.path.getsize("trades.csv") > 0:
         print("No trades were executed. trades.csv is empty.")
 else:
     print("No trades were executed. trades.csv is empty.")
+
+print("✅ Finished running AI Trading Bot.")
