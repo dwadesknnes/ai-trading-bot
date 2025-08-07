@@ -34,5 +34,7 @@ python-telegram-bot==20.6
 transformers==4.41.1
 
 alpaca-trade-api==3.1.0
+alpaca-trade-api
+python-dotenv
 
 torch==2.3.0
