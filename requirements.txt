@@ -1,0 +1,32 @@
+# Core Python packages
+numpy==1.26.4
+pandas==2.2.2
+
+# Technical indicators (choose one or both)
+pandas_ta==0.3.14b0
+ta==0.11.0
+
+# Market data
+yfinance==0.2.40
+ccxt==4.3.75
+
+# Bot infrastructure
+python-dotenv==1.0.1
+requests==2.32.3
+tqdm==4.66.4
+
+# Plotting (optional)
+matplotlib==3.9.0
+
+# Machine learning (optional)
+scikit-learn==1.5.1
+
+# Dashboarding (optional for later)
+streamlit==1.35.0
+
+# NLP/sentiment stuff (only if you use it)
+nltk==3.8.1
+newspaper3k==0.2.8
+
+# Telegram bot (optional)
+python-telegram-bot==20.6
