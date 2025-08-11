@@ -11,6 +11,7 @@ from memory_module import Memory
 from trade_log import TradeLog
 from portfolio import Portfolio
 from execution import place_order_kraken
+from questrade_execution import place_order_questrade
 from trade_reasoning_logger import TradeReasoningLogger
 from alpha_ranking import calc_asset_alpha
 import matplotlib.pyplot as plt
@@ -231,32 +232,73 @@ for ticker, market_type in assets_list:
             confidence=adj_confidence,
             notes="Simulated execution"
         )
-        import os
-from alpaca_trade_api.rest import REST, TimeFrame
 
-def place_order_alpaca(symbol, side, qty, trade_logger=None):
-    api = REST(
-        os.getenv("ALPACA_API_KEY"),
-        os.getenv("ALPACA_API_SECRET"),
-        base_url='https://paper-api.alpaca.markets'  # Use paper trading endpoint
-    )
-    order = api.submit_order(
-        symbol=symbol,
-        qty=qty,
-        side=side,  # 'buy' or 'sell'
-        type='market',
-        time_in_force='gtc'
-    )
-    print(f"Alpaca order placed: {side} {qty} shares of {symbol} (order id: {order.id})")
-    if trade_logger:
-        trade_logger.log_trade(
-            # Fill in with your actual trade logger params
-            symbol=symbol,
-            action=side.upper(),
-            qty=qty,
-            # ... (more fields as needed)
+    if MODE == "LIVE" and market_type == "crypto" and allocated > 0:
+        if not os.getenv("KRAKEN_API_KEY") or not os.getenv("KRAKEN_SECRET"):
+            print("⚠️ Kraken API keys not set. Crypto trade will not execute.")
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action="SKIP",
+                strategy=strategy,
+                signal=signal,
+                sentiment=sentiment,
+                market_regime=regime,
+                confidence=adj_confidence,
+                notes="Missing Kraken API keys"
+            )
+        else:
+            place_order_kraken(ticker, signal, allocated, price, trade_logger)
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action=signal.upper(),
+                strategy=strategy,
+                signal=signal,
+                sentiment=sentiment,
+                market_regime=regime,
+                confidence=adj_confidence,
+                notes="Executed on Kraken"
+            )
+    elif MODE == "LIVE" and market_type == "stock" and allocated > 0:
+        if not os.getenv("QUESTRADE_REFRESH_TOKEN") or not os.getenv("QUESTRADE_ACCOUNT_ID"):
+            print("⚠️ Questrade API credentials not set. Stock trade will not execute.")
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action="SKIP",
+                strategy=strategy,
+                signal=signal,
+                sentiment=sentiment,
+                market_regime=regime,
+                confidence=adj_confidence,
+                notes="Missing Questrade API credentials"
+            )
+        else:
+            place_order_questrade(ticker, signal, int(allocated), trade_logger)
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action=signal.upper(),
+                strategy=strategy,
+                signal=signal,
+                sentiment=sentiment,
+                market_regime=regime,
+                confidence=adj_confidence,
+                notes="Executed on Questrade"
+            )
+    else:
+        trade_reasoning_logger.log_reason(
+            date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+            ticker=ticker,
+            action=signal.upper(),
+            strategy=strategy,
+            signal=signal,
+            sentiment=sentiment,
+            market_regime=regime,
+            confidence=adj_confidence,
+            notes="Simulated execution"
         )
-    return order
 
     portfolio.execute_trade(ticker, signal, price, allocated)
     memory.record_result(ticker, strategy, "win")
