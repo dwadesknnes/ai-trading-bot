@@ -1,0 +1,6 @@
+date,ticker,action,strategy,signal,sentiment,market_regime,confidence,notes
+2025-08-12 00:23,AAPL,SKIP,N/A,N/A,N/A,N/A,0.0,No data or unavailable market
+2025-08-12 00:23,MSFT,SKIP,N/A,N/A,N/A,N/A,0.0,No data or unavailable market
+2025-08-12 00:23,GOOG,SKIP,N/A,N/A,N/A,N/A,0.0,No data or unavailable market
+2025-08-12 00:23,AMZN,SKIP,N/A,N/A,N/A,N/A,0.0,No data or unavailable market
+2025-08-12 00:23,TSLA,SKIP,N/A,N/A,N/A,N/A,0.0,No data or unavailable market

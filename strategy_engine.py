@@ -1,15 +1,24 @@
 # strategy_engine.py
-# Strategy selection engine with confidence scoring
+# Strategy selection engine with confidence scoring and multi-timeframe analysis
 import pandas as pd
+import numpy as np
+from typing import Dict, Tuple, Optional
 
 class StrategyEngine:
-    def __init__(self):
+    def __init__(self, enable_multi_timeframe=True):
         self.strategy_map = {}  # Optional: dynamic assignment later
+        self.enable_multi_timeframe = enable_multi_timeframe
+        self.timeframe_weights = {
+            '1d': 0.5,    # Daily trend (highest weight)
+            '4h': 0.3,    # Intermediate trend
+            '1h': 0.2     # Short-term momentum
+        }
 
     def set_strategy(self, ticker, strategy_name):
         self.strategy_map[ticker] = strategy_name
 
     def get_signal(self, ticker, df):
+        """Single timeframe signal generation (backwards compatible)"""
         strategy = self.strategy_map.get(ticker, "rsi")
         if strategy == "rsi":
             return self._rsi_strategy(df)
@@ -23,6 +32,87 @@ class StrategyEngine:
             return self._momentum(df)
         else:
             return "hold", 0.5, strategy
+
+    def get_multi_timeframe_signal(self, ticker: str, multi_data: Dict[str, pd.DataFrame]) -> Tuple[str, float, str]:
+        """
+        Generate signals using multi-timeframe analysis.
+        
+        Args:
+            ticker: Asset ticker
+            multi_data: Dictionary mapping timeframes to OHLCV data
+        
+        Returns:
+            Tuple[str, float, str]: (signal, confidence, strategy)
+        """
+        if not self.enable_multi_timeframe or not multi_data:
+            # Fallback to single timeframe if no multi-timeframe data
+            primary_tf = next(iter(multi_data.values())) if multi_data else None
+            if primary_tf is not None:
+                return self.get_signal(ticker, primary_tf)
+            return "hold", 0.5, "multi_tf"
+        
+        strategy = self.strategy_map.get(ticker, "rsi")
+        timeframe_signals = {}
+        
+        # Get signals from each timeframe
+        for tf, df in multi_data.items():
+            if df is None or df.empty:
+                continue
+                
+            signal, confidence, _ = self.get_signal(ticker, df)
+            timeframe_signals[tf] = {
+                'signal': signal,
+                'confidence': confidence,
+                'weight': self.timeframe_weights.get(tf, 0.1)
+            }
+        
+        # Combine signals using weighted voting
+        combined_signal, combined_confidence = self._combine_timeframe_signals(timeframe_signals)
+        
+        return combined_signal, combined_confidence, f"multi_tf_{strategy}"
+
+    def _combine_timeframe_signals(self, timeframe_signals: Dict) -> Tuple[str, float]:
+        """
+        Combine signals from multiple timeframes using weighted consensus.
+        
+        Args:
+            timeframe_signals: Dictionary of timeframe signals with weights
+        
+        Returns:
+            Tuple[str, float]: Combined signal and confidence
+        """
+        if not timeframe_signals:
+            return "hold", 0.5
+        
+        signal_scores = {'buy': 0, 'sell': 0, 'hold': 0}
+        total_weight = 0
+        confidence_sum = 0
+        
+        for tf_data in timeframe_signals.values():
+            signal = tf_data['signal']
+            confidence = tf_data['confidence']
+            weight = tf_data['weight']
+            
+            signal_scores[signal] += weight * confidence
+            confidence_sum += confidence * weight
+            total_weight += weight
+        
+        # Normalize scores
+        if total_weight > 0:
+            for signal in signal_scores:
+                signal_scores[signal] /= total_weight
+            confidence_sum /= total_weight
+        
+        # Determine final signal
+        final_signal = max(signal_scores, key=signal_scores.get)
+        final_confidence = min(1.0, confidence_sum)
+        
+        # Add consensus bonus - if multiple timeframes agree, increase confidence
+        max_score = signal_scores[final_signal]
+        consensus_bonus = 0.1 if max_score > 0.6 else 0  # Bonus if strong agreement
+        final_confidence = min(1.0, final_confidence + consensus_bonus)
+        
+        return final_signal, final_confidence
 
     def _rsi_strategy(self, df):
         delta = df["Close"].diff()

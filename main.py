@@ -3,7 +3,7 @@ import pandas as pd
 import warnings
 import concurrent.futures
 warnings.filterwarnings("ignore")
-from data import fetch_data
+from data import fetch_data, fetch_multi_timeframe_data, align_timeframes
 from strategy_engine import StrategyEngine
 from sentiment import get_combined_sentiment as get_sentiment_score
 from risk import RiskManager, evaluate_performance
@@ -69,8 +69,18 @@ for ticker, mtype in assets_list:
 
 MODE = "LIVE"
 STARTING_CAPITAL = 10000
-strategy_engine = StrategyEngine()
-risk_manager = RiskManager()
+
+# Load advanced features configuration
+from config import ADVANCED_FEATURES, RISK_DEFAULTS
+
+ENABLE_MULTI_TIMEFRAME = ADVANCED_FEATURES.get("ENABLE_MULTI_TIMEFRAME", True)
+ENABLE_KELLY_CRITERION = ADVANCED_FEATURES.get("ENABLE_KELLY_CRITERION", True)
+
+strategy_engine = StrategyEngine(enable_multi_timeframe=ENABLE_MULTI_TIMEFRAME)
+risk_manager = RiskManager(
+    enable_kelly_criterion=ENABLE_KELLY_CRITERION,
+    **RISK_DEFAULTS
+)
 memory = Memory()
 trade_logger = TradeLog()
 portfolio = Portfolio(STARTING_CAPITAL)
@@ -81,7 +91,11 @@ print(f"Auto-selected stocks: {assets['stocks']}")
 print(f"Auto-selected cryptos: {assets['crypto']}")
 
 def fetch_data_parallel(ticker, market_type):
-    return fetch_data(ticker, interval="1d", market_type=market_type)
+    """Fetch data with multi-timeframe support if enabled."""
+    if ENABLE_MULTI_TIMEFRAME:
+        return fetch_multi_timeframe_data(ticker, market_type=market_type)
+    else:
+        return fetch_data(ticker, interval="1d", market_type=market_type)
 
 data_results = {}
 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -126,32 +140,66 @@ else:
 
 for ticker, market_type in assets_list:
     print(f"\n--- {ticker} ({market_type}) ---")
-    df = data_results.get((ticker, market_type), None)
-    if df is None or not hasattr(df, "empty") or df.empty:
-        print(f"No data for {ticker}")
-        trade_reasoning_logger.log_reason(
-            date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
-            ticker=ticker,
-            action="SKIP",
-            strategy="N/A",
-            signal="N/A",
-            sentiment="N/A",
-            market_regime="N/A",
-            confidence=0.0,
-            notes="No data or unavailable market"
-        )
-        continue
+    data = data_results.get((ticker, market_type), None)
+    
+    # Handle both single timeframe and multi-timeframe data
+    if ENABLE_MULTI_TIMEFRAME:
+        if data is None or not data:
+            print(f"No data for {ticker}")
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action="SKIP",
+                strategy="N/A",
+                signal="N/A",
+                sentiment="N/A",
+                market_regime="N/A",
+                confidence=0.0,
+                notes="No multi-timeframe data available"
+            )
+            continue
+        
+        # Align timeframes for consistent analysis
+        aligned_data = align_timeframes(data)
+        
+        # Use primary timeframe for regime detection
+        primary_df = next(iter(aligned_data.values())) if aligned_data else None
+    else:
+        # Single timeframe mode (backwards compatible)
+        if data is None or not hasattr(data, "empty") or data.empty:
+            print(f"No data for {ticker}")
+            trade_reasoning_logger.log_reason(
+                date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                ticker=ticker,
+                action="SKIP",
+                strategy="N/A",
+                signal="N/A",
+                sentiment="N/A",
+                market_regime="N/A",
+                confidence=0.0,
+                notes="No data or unavailable market"
+            )
+            continue
+        primary_df = data
+        aligned_data = {'1d': data}  # Wrap for consistency
 
     # --- Dynamic strategy selection ---
     chosen_strategy = select_best_strategy(ticker, memory)
     strategy_engine.set_strategy(ticker, chosen_strategy)
-    signal, confidence, strategy = strategy_engine.get_signal(ticker, df)
+    
+    # Get signal using appropriate method
+    if ENABLE_MULTI_TIMEFRAME and len(aligned_data) > 1:
+        signal, confidence, strategy = strategy_engine.get_multi_timeframe_signal(ticker, aligned_data)
+        print(f"Multi-timeframe analysis: {list(aligned_data.keys())}")
+    else:
+        signal, confidence, strategy = strategy_engine.get_signal(ticker, primary_df)
+    
     sentiment = get_sentiment_score(ticker)
     adj_confidence = min(1.0, confidence + 0.1 * sentiment)
 
     # --- Regime detection (simple version) ---
-    price = float(df['Close'].iloc[-1])
-    regime = "bull" if price > df['Close'].mean() else "bear"
+    price = float(primary_df['Close'].iloc[-1])
+    regime = "bull" if price > primary_df['Close'].mean() else "bear"
     print(f"Signal: {signal.upper()} | Strategy: {strategy} | Confidence: {confidence:.2f}")
     print(f"Sentiment: {sentiment:.2f} | Adj. Confidence: {adj_confidence:.2f} | Regime: {regime}", end=" ")
 
@@ -170,10 +218,29 @@ for ticker, market_type in assets_list:
         )
         continue
 
-    params = risk_manager.get_risk_params(portfolio.capital, price, adj_confidence, market_type)
+    # Load trade history for Kelly criterion if enabled
+    trade_history = None
+    if ENABLE_KELLY_CRITERION:
+        try:
+            if os.path.exists("trades.csv") and os.path.getsize("trades.csv") > 0:
+                trade_history = pd.read_csv("trades.csv")
+        except Exception as e:
+            print(f"Warning: Could not load trade history for Kelly criterion: {e}")
+
+    params = risk_manager.get_risk_params(
+        portfolio.capital, 
+        price, 
+        adj_confidence, 
+        market_type,
+        trade_history=trade_history
+    )
     position_size = params["size"]
     stop_loss = params["stop_loss"]
     take_profit = params["take_profit"]
+    
+    # Display Kelly information if available
+    if params.get("kelly_fraction") is not None:
+        print(f"Kelly fraction: {params['kelly_fraction']:.3f}")
 
     allocated = portfolio.allocate(ticker, position_size, price)
     if allocated == 0:
@@ -318,9 +385,20 @@ for ticker, market_type in assets_list:
 
 final_portfolio_value = portfolio.capital
 for ticker, market_type in assets_list:
-    df = data_results.get((ticker, market_type), None)
-    if df is not None and not df.empty:
-        price = float(df["Close"].iloc[-1])
+    data = data_results.get((ticker, market_type), None)
+    
+    # Handle both single and multi-timeframe data for final valuation
+    if ENABLE_MULTI_TIMEFRAME:
+        if data and isinstance(data, dict):
+            # Multi-timeframe data - use primary timeframe
+            primary_df = next(iter(data.values())) if data else None
+        else:
+            primary_df = data
+    else:
+        primary_df = data
+    
+    if primary_df is not None and not primary_df.empty:
+        price = float(primary_df["Close"].iloc[-1])
         final_portfolio_value += portfolio.get_value({ticker: price})
 
 print(f"\nFINAL capital: ${portfolio.capital:.2f} | FINAL portfolio value: ${final_portfolio_value - portfolio.capital:.2f} | TOTAL: ${final_portfolio_value:.2f}")
