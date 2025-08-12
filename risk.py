@@ -1,9 +1,11 @@
 # risk.py
-# Modular risk management engine with Kelly criterion position sizing
+# Modular risk management engine with Kelly criterion position sizing and correlation capping
 
 from config import BASE_CAPITAL
 import numpy as np
 import pandas as pd
+import yfinance as yf
+import logging
 from typing import Optional, Dict, Any
 
 class RiskManager:
@@ -24,8 +26,19 @@ class RiskManager:
         self.default_stop_pct_crypto = default_stop_pct_crypto
         self.default_take_profit_pct_crypto = default_take_profit_pct_crypto
         self.enable_kelly_criterion = enable_kelly_criterion
+        
+        # Phase 2: Correlation capping settings
+        try:
+            from config import ADVANCED_FEATURES
+            self.enable_correlation_cap = ADVANCED_FEATURES.get("ENABLE_CORRELATION_CAP", True)
+            self.max_position_corr = ADVANCED_FEATURES.get("MAX_POSITION_CORR", 0.7)
+            self.correlation_lookback = ADVANCED_FEATURES.get("CORRELATION_LOOKBACK", 30)
+        except ImportError:
+            self.enable_correlation_cap = True
+            self.max_position_corr = 0.7
+            self.correlation_lookback = 30
 
-    def get_risk_params(self, balance, price, confidence, market_type="stock", trade_history=None):
+    def get_risk_params(self, balance, price, confidence, market_type="stock", trade_history=None, current_positions=None, candidate_ticker=None):
         """
         Get risk parameters including position sizing using Kelly criterion if enabled.
         
@@ -35,6 +48,8 @@ class RiskManager:
             confidence: Signal confidence (0-1)
             market_type: 'stock' or 'crypto'
             trade_history: DataFrame of historical trades for Kelly calculation
+            current_positions: Dictionary of current positions for correlation check
+            candidate_ticker: Ticker being considered for new position
         
         Returns:
             Dict with risk parameters including position size
@@ -52,10 +67,27 @@ class RiskManager:
         else:
             raise ValueError("market_type must be 'stock' or 'crypto'")
 
+        # Phase 2: Check correlation cap before allowing trade
+        correlation_check = self._check_correlation_cap(candidate_ticker, current_positions, market_type)
+        if not correlation_check['allowed']:
+            logging.info(f"Trade blocked due to correlation cap: {correlation_check['reason']}")
+            return {
+                "size": 0,
+                "stop_loss": 0,
+                "take_profit": 0,
+                "allocation": 0,
+                "stop_pct": stop_pct,
+                "take_profit_pct": take_profit_pct,
+                "kelly_fraction": None,
+                "correlation_blocked": True,
+                "correlation_details": correlation_check
+            }
+
         # Calculate base allocation
         base_allocation = max_alloc * (0.5 + 0.5 * confidence)
         
         # Apply Kelly criterion if enabled and trade history is available
+        kelly_fraction = None
         if self.enable_kelly_criterion and trade_history is not None:
             kelly_fraction = self.calculate_kelly_criterion(trade_history)
             kelly_allocation = balance * kelly_fraction
@@ -76,7 +108,9 @@ class RiskManager:
             "allocation": allocation,
             "stop_pct": stop_pct,
             "take_profit_pct": take_profit_pct,
-            "kelly_fraction": kelly_fraction if self.enable_kelly_criterion and trade_history is not None else None
+            "kelly_fraction": kelly_fraction,
+            "correlation_blocked": False,
+            "correlation_details": correlation_check
         }
 
     def calculate_kelly_criterion(self, trade_history: pd.DataFrame, lookback_periods: int = 50) -> float:
@@ -167,6 +201,105 @@ class RiskManager:
             "win_loss_ratio": win_loss_ratio,
             "sample_size": len(trade_history)
         }
+    
+    def _check_correlation_cap(self, candidate_ticker: str, current_positions: Optional[Dict], market_type: str) -> Dict:
+        """
+        Check if adding the candidate ticker would violate correlation limits.
+        
+        Args:
+            candidate_ticker: Ticker being considered for new position
+            current_positions: Dictionary of current positions {ticker: position_info}
+            market_type: 'stock' or 'crypto'
+        
+        Returns:
+            Dict: Correlation check result
+        """
+        if not self.enable_correlation_cap or not current_positions or not candidate_ticker:
+            return {"allowed": True, "reason": "No correlation check needed"}
+        
+        try:
+            # Get tickers of current positions
+            position_tickers = list(current_positions.keys())
+            
+            if not position_tickers:
+                return {"allowed": True, "reason": "No existing positions"}
+            
+            # Calculate correlations
+            correlations = self._calculate_position_correlations(candidate_ticker, position_tickers, market_type)
+            
+            # Check if any correlation exceeds threshold
+            max_correlation = max(correlations.values()) if correlations else 0
+            
+            if max_correlation > self.max_position_corr:
+                return {
+                    "allowed": False,
+                    "reason": f"Max correlation {max_correlation:.3f} exceeds limit {self.max_position_corr}",
+                    "correlations": correlations,
+                    "max_correlation": max_correlation
+                }
+            
+            return {
+                "allowed": True,
+                "reason": f"Correlations within limits (max: {max_correlation:.3f})",
+                "correlations": correlations,
+                "max_correlation": max_correlation
+            }
+            
+        except Exception as e:
+            logging.warning(f"Correlation check failed for {candidate_ticker}: {e}")
+            return {"allowed": True, "reason": f"Correlation check error: {e}"}
+    
+    def _calculate_position_correlations(self, candidate_ticker: str, position_tickers: list, market_type: str) -> Dict[str, float]:
+        """
+        Calculate correlations between candidate ticker and existing positions.
+        
+        Args:
+            candidate_ticker: New ticker to check
+            position_tickers: List of existing position tickers
+            market_type: Market type for data fetching
+        
+        Returns:
+            Dict mapping position ticker to correlation coefficient
+        """
+        correlations = {}
+        
+        try:
+            # Fetch price data for candidate ticker
+            if market_type == "stock":
+                candidate_data = yf.download(candidate_ticker, period=f"{self.correlation_lookback}d", progress=False)
+                if candidate_data.empty:
+                    return correlations
+                candidate_prices = candidate_data['Close']
+            else:
+                # For crypto, use simplified correlation (could be enhanced with ccxt)
+                logging.info(f"Crypto correlation calculation simplified for {candidate_ticker}")
+                return correlations
+            
+            for position_ticker in position_tickers:
+                try:
+                    if market_type == "stock":
+                        position_data = yf.download(position_ticker, period=f"{self.correlation_lookback}d", progress=False)
+                        if position_data.empty:
+                            continue
+                        position_prices = position_data['Close']
+                        
+                        # Align data and calculate correlation
+                        aligned_data = pd.concat([candidate_prices, position_prices], axis=1, keys=[candidate_ticker, position_ticker])
+                        aligned_data = aligned_data.dropna()
+                        
+                        if len(aligned_data) > 5:  # Need minimum data points
+                            correlation = aligned_data[candidate_ticker].corr(aligned_data[position_ticker])
+                            if not pd.isna(correlation):
+                                correlations[position_ticker] = abs(correlation)  # Use absolute correlation
+                                
+                except Exception as e:
+                    logging.warning(f"Failed to calculate correlation with {position_ticker}: {e}")
+                    continue
+                    
+        except Exception as e:
+            logging.warning(f"Failed to fetch candidate data for {candidate_ticker}: {e}")
+        
+        return correlations
 
 def evaluate_performance(df_trades):
     """

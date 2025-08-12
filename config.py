@@ -23,11 +23,22 @@ ADVANCED_FEATURES = {
         "1h": 0.2    # Short-term momentum
     },
     
+    # Phase 2: Multi-timeframe confirmation
+    "CONFIRM_TIMEFRAMES": ["1d", "4h"],  # Timeframes that must confirm signal
+    "CONFIRM_THRESHOLD": 0.6,            # Minimum agreement percentage (0.0-1.0)
+    "ENABLE_TIMEFRAME_CONFIRMATION": True,
+    
     # Kelly criterion position sizing
     "ENABLE_KELLY_CRITERION": True,
     "KELLY_LOOKBACK_PERIODS": 50,
     "KELLY_MAX_FRACTION": 0.25,  # Cap at 25% for safety
     "KELLY_MIN_SAMPLE_SIZE": 10,
+    "KELLY_CAP": 0.25,           # Phase 2: Maximum Kelly fraction cap
+    
+    # Phase 2: Correlation cap for position management
+    "ENABLE_CORRELATION_CAP": True,
+    "MAX_POSITION_CORR": 0.7,    # Maximum correlation between positions
+    "CORRELATION_LOOKBACK": 30,   # Days to look back for correlation calculation
     
     # Enhanced sentiment analysis
     "ENABLE_ENHANCED_SENTIMENT": True,
@@ -38,6 +49,9 @@ ADVANCED_FEATURES = {
         "technical": 0.2,
         "market": 0.1
     },
+    
+    # Phase 2: Shadow mode (no actual trades)
+    "ENABLE_SHADOW_MODE": False,  # Set to True to disable actual trading
     
     # Risk management
     "ENABLE_ADAPTIVE_RISK": True,

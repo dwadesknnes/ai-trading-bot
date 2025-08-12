@@ -237,16 +237,10 @@
   font-size: 0.8rem;
 }
 
-/* Trades Card */
-.trades-table {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
+/* Enhanced Trades Table with Phase 2 data */
 .table-header {
   display: grid;
-  grid-template-columns: 80px 80px 60px 70px 80px 70px;
+  grid-template-columns: 80px 80px 60px 50px 80px 50px 50px 100px;
   gap: 10px;
   padding: 10px;
   background: rgba(0, 255, 136, 0.1);
@@ -258,7 +252,7 @@
 
 .table-row {
   display: grid;
-  grid-template-columns: 80px 80px 60px 70px 80px 70px;
+  grid-template-columns: 80px 80px 60px 50px 80px 50px 50px 100px;
   gap: 10px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.03);
@@ -269,6 +263,274 @@
 
 .action.buy { color: #00ff88; }
 .action.sell { color: #ff4444; }
+.action.blocked { color: #ffaa00; }
+
+.kelly-data { color: #88ccff; }
+
+.correlation.high { color: #ff4444; }
+.correlation.medium { color: #ffaa00; }
+.correlation.low { color: #00ff88; }
+
+.status.confirmed { color: #00ff88; }
+.status.unconfirmed { color: #ff4444; }
+.status.correlation-blocked { color: #ffaa00; }
+
+/* Phase 2: Correlation Matrix */
+.correlation-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.matrix-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.matrix-header {
+  display: grid;
+  grid-template-columns: 80px repeat(4, 1fr);
+  gap: 5px;
+  font-weight: bold;
+  color: #00ff88;
+  padding: 5px 0;
+}
+
+.matrix-row {
+  display: grid;
+  grid-template-columns: 80px repeat(4, 1fr);
+  gap: 5px;
+  align-items: center;
+}
+
+.asset-label {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.correlation-cell {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.correlation-cell:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.high-corr {
+  background: rgba(255, 68, 68, 0.3);
+  color: #ff4444;
+  border: 1px solid #ff4444;
+}
+
+.medium-corr {
+  background: rgba(255, 170, 0, 0.3);
+  color: #ffaa00;
+  border: 1px solid #ffaa00;
+}
+
+.low-corr {
+  background: rgba(0, 255, 136, 0.3);
+  color: #00ff88;
+  border: 1px solid #00ff88;
+}
+
+.correlation-legend {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+
+/* Phase 2: Confirmation Status */
+.confirmation-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.confirmation-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 15px;
+}
+
+.confirmation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.symbol {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.status-badge.confirmed {
+  background: rgba(0, 255, 136, 0.2);
+  color: #00ff88;
+  border: 1px solid #00ff88;
+}
+
+.status-badge.unconfirmed {
+  background: rgba(255, 68, 68, 0.2);
+  color: #ff4444;
+  border: 1px solid #ff4444;
+}
+
+.confirmation-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agreement-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-container {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.agreement-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.agreement-text {
+  font-size: 0.85rem;
+  font-weight: bold;
+  min-width: 80px;
+}
+
+.timeframes, .details-text {
+  font-size: 0.85rem;
+  color: #cccccc;
+}
+
+/* Phase 2: Shadow Mode */
+.shadow-mode-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #333;
+  transition: 0.4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #00ff88;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.toggle-label {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.shadow-mode-description {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #cccccc;
+  border-left: 4px solid #00ff88;
+}
+
+.shadow-mode-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.shadow-mode-stats .stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
 
 .pnl.positive { color: #00ff88; }
 .pnl.negative { color: #ff4444; }
@@ -302,13 +564,38 @@
   
   .table-header,
   .table-row {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     font-size: 0.7rem;
+    gap: 5px;
   }
   
   .kelly-metrics,
-  .performance-metrics {
+  .performance-metrics,
+  .shadow-mode-stats {
     grid-template-columns: 1fr;
+  }
+  
+  .matrix-header,
+  .matrix-row {
+    grid-template-columns: 60px repeat(4, 1fr);
+    gap: 3px;
+  }
+  
+  .correlation-cell {
+    padding: 4px 2px;
+    font-size: 0.7rem;
+  }
+  
+  .confirmation-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .toggle-container {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
   }
 }
 

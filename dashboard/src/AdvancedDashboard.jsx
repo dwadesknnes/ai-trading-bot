@@ -7,6 +7,10 @@ const AdvancedDashboard = () => {
   const [sentimentData, setSentimentData] = useState(null);
   const [multiTimeframeSignals, setMultiTimeframeSignals] = useState(null);
   const [tradeHistory, setTradeHistory] = useState([]);
+  // Phase 2: New state for advanced analytics
+  const [correlationMatrix, setCorrelationMatrix] = useState(null);
+  const [confirmationStatus, setConfirmationStatus] = useState(null);
+  const [shadowModeEnabled, setShadowModeEnabled] = useState(false);
 
   // Simulated data loading (in real implementation, fetch from backend)
   useEffect(() => {
@@ -68,12 +72,71 @@ const AdvancedDashboard = () => {
       }
     });
 
-    // Simulate recent trades
+    // Simulate recent trades with Phase 2 data
     setTradeHistory([
-      { date: '2024-01-15', symbol: 'AAPL', action: 'BUY', quantity: 10, price: 185.50, pnl: 0 },
-      { date: '2024-01-14', symbol: 'BTC/USDT', action: 'SELL', quantity: 0.05, price: 42300, pnl: 156.50 },
-      { date: '2024-01-13', symbol: 'MSFT', action: 'BUY', quantity: 15, price: 378.20, pnl: 0 }
+      { 
+        date: '2024-01-15', 
+        symbol: 'AAPL', 
+        action: 'BUY', 
+        quantity: 10, 
+        price: 185.50, 
+        pnl: 0,
+        kellyFraction: 0.12,
+        maxCorrelation: 0.45,
+        confirmationStatus: 'CONFIRMED'
+      },
+      { 
+        date: '2024-01-14', 
+        symbol: 'BTC/USDT', 
+        action: 'SELL', 
+        quantity: 0.05, 
+        price: 42300, 
+        pnl: 156.50,
+        kellyFraction: 0.08,
+        maxCorrelation: 0.23,
+        confirmationStatus: 'CONFIRMED'
+      },
+      { 
+        date: '2024-01-13', 
+        symbol: 'MSFT', 
+        action: 'BLOCKED', 
+        quantity: 0, 
+        price: 378.20, 
+        pnl: 0,
+        kellyFraction: 0.15,
+        maxCorrelation: 0.78,
+        confirmationStatus: 'CORRELATION_BLOCKED'
+      }
     ]);
+
+    // Phase 2: Simulate correlation matrix
+    setCorrelationMatrix({
+      assets: ['AAPL', 'MSFT', 'GOOGL', 'BTC/USDT'],
+      matrix: [
+        [1.00, 0.45, 0.52, 0.12],
+        [0.45, 1.00, 0.78, 0.08],
+        [0.52, 0.78, 1.00, 0.15],
+        [0.12, 0.08, 0.15, 1.00]
+      ]
+    });
+
+    // Phase 2: Simulate confirmation status
+    setConfirmationStatus({
+      AAPL: {
+        confirmed: true,
+        agreementRatio: 0.75,
+        threshold: 0.6,
+        timeframes: ['1d', '4h'],
+        details: 'Strong agreement across timeframes'
+      },
+      'BTC/USDT': {
+        confirmed: false,
+        agreementRatio: 0.50,
+        threshold: 0.6,
+        timeframes: ['1d', '4h', '1h'],
+        details: 'Conflicting signals between timeframes'
+      }
+    });
   }, []);
 
   const formatCurrency = (value) => {
@@ -249,7 +312,7 @@ const AdvancedDashboard = () => {
           )}
         </div>
 
-        {/* Recent Trades */}
+        {/* Recent Trades - Enhanced with Phase 2 data */}
         <div className="card trades-card">
           <h2>📋 Recent Trades</h2>
           <div className="trades-table">
@@ -257,9 +320,11 @@ const AdvancedDashboard = () => {
               <span>Date</span>
               <span>Symbol</span>
               <span>Action</span>
-              <span>Quantity</span>
+              <span>Qty</span>
               <span>Price</span>
-              <span>P&L</span>
+              <span>Kelly%</span>
+              <span>Corr</span>
+              <span>Status</span>
             </div>
             {tradeHistory.map((trade, idx) => (
               <div key={idx} className="table-row">
@@ -270,11 +335,141 @@ const AdvancedDashboard = () => {
                 </span>
                 <span>{trade.quantity}</span>
                 <span>{formatCurrency(trade.price)}</span>
-                <span className={`pnl ${trade.pnl >= 0 ? 'positive' : 'negative'}`}>
-                  {trade.pnl !== 0 ? formatCurrency(trade.pnl) : '-'}
+                <span className="kelly-data">
+                  {trade.kellyFraction ? `${(trade.kellyFraction * 100).toFixed(1)}%` : '-'}
+                </span>
+                <span className={`correlation ${trade.maxCorrelation > 0.7 ? 'high' : trade.maxCorrelation > 0.5 ? 'medium' : 'low'}`}>
+                  {trade.maxCorrelation ? trade.maxCorrelation.toFixed(2) : '-'}
+                </span>
+                <span className={`status ${trade.confirmationStatus.toLowerCase().replace('_', '-')}`}>
+                  {trade.confirmationStatus}
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Phase 2: Correlation Heatmap */}
+        <div className="card correlation-card">
+          <h2>🔗 Position Correlation Matrix</h2>
+          {correlationMatrix && (
+            <div className="correlation-matrix">
+              <div className="matrix-grid">
+                <div className="matrix-header">
+                  <span></span>
+                  {correlationMatrix.assets.map(asset => (
+                    <span key={asset} className="asset-label">{asset}</span>
+                  ))}
+                </div>
+                {correlationMatrix.matrix.map((row, i) => (
+                  <div key={i} className="matrix-row">
+                    <span className="asset-label">{correlationMatrix.assets[i]}</span>
+                    {row.map((corr, j) => (
+                      <span 
+                        key={j} 
+                        className={`correlation-cell ${
+                          corr > 0.7 ? 'high-corr' : 
+                          corr > 0.4 ? 'medium-corr' : 
+                          'low-corr'
+                        }`}
+                        title={`Correlation: ${corr.toFixed(3)}`}
+                      >
+                        {corr.toFixed(2)}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="correlation-legend">
+                <span className="legend-item">
+                  <span className="legend-color high-corr"></span>
+                  High (&gt;0.7)
+                </span>
+                <span className="legend-item">
+                  <span className="legend-color medium-corr"></span>
+                  Medium (0.4-0.7)
+                </span>
+                <span className="legend-item">
+                  <span className="legend-color low-corr"></span>
+                  Low (&lt;0.4)
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Phase 2: Multi-Timeframe Confirmation Status */}
+        <div className="card confirmation-card">
+          <h2>✅ Timeframe Confirmation Status</h2>
+          {confirmationStatus && (
+            <div className="confirmation-grid">
+              {Object.entries(confirmationStatus).map(([symbol, status]) => (
+                <div key={symbol} className="confirmation-item">
+                  <div className="confirmation-header">
+                    <span className="symbol">{symbol}</span>
+                    <span className={`status-badge ${status.confirmed ? 'confirmed' : 'unconfirmed'}`}>
+                      {status.confirmed ? '✅ CONFIRMED' : '❌ UNCONFIRMED'}
+                    </span>
+                  </div>
+                  <div className="confirmation-details">
+                    <div className="agreement-bar">
+                      <div className="bar-container">
+                        <div 
+                          className="agreement-fill"
+                          style={{ 
+                            width: `${status.agreementRatio * 100}%`,
+                            backgroundColor: status.confirmed ? '#00ff88' : '#ff4444'
+                          }}
+                        ></div>
+                      </div>
+                      <span className="agreement-text">
+                        {(status.agreementRatio * 100).toFixed(1)}% / {(status.threshold * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="timeframes">
+                      Timeframes: {status.timeframes.join(', ')}
+                    </div>
+                    <div className="details-text">{status.details}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Phase 2: Shadow Mode Control */}
+        <div className="card shadow-mode-card">
+          <h2>🔮 Shadow Mode</h2>
+          <div className="shadow-mode-controls">
+            <div className="toggle-container">
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={shadowModeEnabled}
+                  onChange={(e) => setShadowModeEnabled(e.target.checked)}
+                />
+                <span className="slider"></span>
+              </label>
+              <span className="toggle-label">
+                {shadowModeEnabled ? 'Shadow Mode ON' : 'Live Trading ON'}
+              </span>
+            </div>
+            <div className="shadow-mode-description">
+              {shadowModeEnabled ? 
+                '🔮 Trading signals will be logged but no actual trades will be executed.' :
+                '💰 Live trading mode - signals will result in actual trades.'
+              }
+            </div>
+            <div className="shadow-mode-stats">
+              <div className="stat">
+                <span className="label">Shadow Signals Today:</span>
+                <span className="value">12</span>
+              </div>
+              <div className="stat">
+                <span className="label">Hypothetical P&L:</span>
+                <span className="value positive">+$145.30</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -1,8 +1,54 @@
 # AI Trading Bot 🤖📈
 
-An advanced AI-powered trading bot that can teach itself and learn from trades. Features autonomous learning strategies, multi-timeframe analysis, Kelly criterion position sizing, and enhanced sentiment analysis for both crypto and stock trading.
+An advanced AI-powered trading bot that can teach itself and learn from trades. Features autonomous learning strategies, multi-timeframe analysis, Kelly criterion position sizing, enhanced sentiment analysis, and Phase 2 advanced risk management for both crypto and stock trading.
 
-## 🚀 New Advanced Features
+## 🚀 Phase 2 (Alpha-v2) Advanced Features
+
+### Multi-Timeframe Confirmation System
+- **Configurable timeframe agreement** - Requires agreement between 2+ timeframes for trades
+- **CONFIRM_TIMEFRAMES** - Set which timeframes must confirm signals (default: ["1d", "4h"])
+- **CONFIRM_THRESHOLD** - Minimum agreement percentage (default: 0.6 = 60%)
+- **Smart fallback logic** - Gracefully handles insufficient confirmation data
+- **Detailed logging** - All confirmation checks logged with reasoning
+
+### Position Correlation Capping
+- **Real-time correlation analysis** - Calculates correlation between candidate assets and existing positions
+- **MAX_POSITION_CORR** - Maximum allowed correlation (default: 0.7)
+- **CORRELATION_LOOKBACK** - Days of price history for correlation (default: 30)
+- **Dynamic blocking** - Prevents over-concentration in correlated assets
+- **Correlation heatmap** - Visual correlation matrix in dashboard
+
+### Enhanced Kelly Criterion Position Sizing
+- **Per-trade Kelly statistics** - Individual Kelly fractions logged for each trade
+- **KELLY_CAP** - Safety cap on Kelly fractions (default: 0.25 = 25%)
+- **Enhanced logging** - Win rate, avg win/loss, and sample size tracking
+- **Dashboard integration** - Real-time Kelly metrics and performance visualization
+- **Smart fallbacks** - Conservative defaults for insufficient data
+
+### Advanced Sentiment Data Fusion
+- **Multi-source aggregation** - Combines news, social, technical, and market sentiment
+- **Configurable source weights** - Customize importance of each sentiment source
+- **Quality-based weighting** - Sources weighted by data quality and recency
+- **Enhanced caching** - 1-hour sentiment cache for performance
+- **Detailed breakdowns** - Source-by-source sentiment analysis in dashboard
+
+### Shadow Mode Trading
+- **Risk-free testing** - Generate signals without executing actual trades
+- **ENABLE_SHADOW_MODE** - Toggle between live and shadow trading
+- **Complete signal logging** - All signals tracked with full reasoning
+- **Hypothetical P&L** - Track shadow mode performance
+- **Easy toggling** - Dashboard control for shadow mode activation
+
+### Advanced Dashboard Analytics
+- **Multi-timeframe confirmation status** - Visual confirmation indicators per asset
+- **Kelly criterion metrics** - Real-time Kelly stats and historical performance
+- **Correlation heatmap** - Interactive correlation matrix with color coding
+- **Enhanced trade log** - Kelly fractions, correlations, and confirmation status
+- **Sentiment source breakdown** - Detailed sentiment analysis per source
+- **Shadow mode controls** - Toggle and monitor shadow trading
+- **Downloadable logs** - Export trade data and analytics
+
+## 📊 Core Features
 
 ### Multi-Timeframe Analysis
 - **Simultaneous analysis** across multiple timeframes (1d, 4h, 1h)
@@ -25,33 +71,9 @@ An advanced AI-powered trading bot that can teach itself and learn from trades. 
 ### Advanced Risk Management
 - **Kelly-adjusted** position sizing
 - **Multi-timeframe** risk assessment
+- **Correlation-based** position limits
 - **Dynamic stop-loss** and take-profit levels
 - **Performance metrics** tracking
-
-## 📊 Features
-
-### Core Trading Engine
-- **Dynamic strategy switching** based on performance
-- **Real-time sentiment analysis** using transformers/VADER
-- **Risk management** with position sizing and stop-losses
-- **Memory system** for strategy performance tracking
-- **Alpha ranking** of assets based on historical performance
-
-### Supported Strategies
-- RSI (Relative Strength Index)
-- SMA Crossover (Simple Moving Average)
-- MACD (Moving Average Convergence Divergence)
-- Bollinger Bands
-- Momentum-based strategies
-
-### Markets Supported
-- **Stocks** via Yahoo Finance (yfinance)
-- **Cryptocurrencies** via Kraken API (ccxt)
-
-### Execution Platforms
-- **Kraken** for cryptocurrency trading
-- **Questrade** for stock trading
-- **Simulation mode** for backtesting
 
 ## 🛠️ Installation
 
@@ -74,6 +96,26 @@ cp env.example .env
 
 ## ⚙️ Configuration
 
+### Phase 2 Advanced Configuration
+```python
+# Multi-timeframe confirmation
+CONFIRM_TIMEFRAMES = ["1d", "4h"]  # Timeframes that must confirm
+CONFIRM_THRESHOLD = 0.6            # 60% agreement required
+ENABLE_TIMEFRAME_CONFIRMATION = True
+
+# Correlation capping
+MAX_POSITION_CORR = 0.7           # Max 70% correlation
+CORRELATION_LOOKBACK = 30         # 30 days of price history
+ENABLE_CORRELATION_CAP = True
+
+# Kelly criterion enhancements
+KELLY_CAP = 0.25                  # Maximum 25% Kelly allocation
+ENABLE_KELLY_CRITERION = True
+
+# Shadow mode
+ENABLE_SHADOW_MODE = False        # Set True for signal-only mode
+```
+
 ### Environment Variables
 ```bash
 # Kraken API (for crypto trading)
@@ -85,16 +127,16 @@ QUESTRADE_REFRESH_TOKEN=your_questrade_refresh_token
 QUESTRADE_ACCOUNT_ID=your_questrade_account_id
 ```
 
-### Feature Flags (in main.py)
-```python
-ENABLE_MULTI_TIMEFRAME = True   # Enable multi-timeframe analysis
-ENABLE_KELLY_CRITERION = True   # Enable Kelly criterion position sizing
-```
-
 ## 🏃‍♂️ Running the Bot
 
 ### Live Trading
 ```bash
+python main.py
+```
+
+### Shadow Mode (Signals Only)
+```bash
+# Edit config.py: ENABLE_SHADOW_MODE = True
 python main.py
 ```
 
@@ -103,7 +145,7 @@ python main.py
 python backtester.py
 ```
 
-### Dashboard
+### Advanced Dashboard
 ```bash
 cd dashboard
 npm install
@@ -115,131 +157,152 @@ npm run dev
 python test_advanced_features.py
 ```
 
-## 📈 Advanced Usage Examples
+## 📈 Phase 2 Usage Examples
 
-### Multi-Timeframe Analysis
+### Multi-Timeframe Confirmation
 ```python
-from data import fetch_multi_timeframe_data, align_timeframes
 from strategy_engine import StrategyEngine
 
-# Fetch multi-timeframe data
-multi_data = fetch_multi_timeframe_data('AAPL', ['1d', '4h', '1h'])
-aligned_data = align_timeframes(multi_data)
-
-# Analyze with multi-timeframe strategy
+# Enable confirmation with custom settings
 engine = StrategyEngine(enable_multi_timeframe=True)
-signal, confidence, strategy = engine.get_multi_timeframe_signal('AAPL', aligned_data)
+engine.confirm_timeframes = ["1d", "4h"]
+engine.confirm_threshold = 0.75  # 75% agreement required
+
+signal, confidence, strategy = engine.get_multi_timeframe_signal('AAPL', multi_data)
+print(f"Signal: {signal}, Confirmed: {'✅' if 'unconfirmed' not in strategy else '❌'}")
 ```
 
-### Kelly Criterion Position Sizing
+### Correlation Analysis
+```python
+from risk import RiskManager
+
+risk_manager = RiskManager(enable_correlation_cap=True)
+current_positions = {"AAPL": {"qty": 100}, "MSFT": {"qty": 50}}
+
+params = risk_manager.get_risk_params(
+    balance=10000,
+    price=300,
+    confidence=0.8,
+    market_type='stock',
+    current_positions=current_positions,
+    candidate_ticker='GOOGL'
+)
+
+if params['correlation_blocked']:
+    print(f"Trade blocked: {params['correlation_details']['reason']}")
+else:
+    print(f"Trade allowed, max correlation: {params['correlation_details']['max_correlation']}")
+```
+
+### Enhanced Kelly Statistics
 ```python
 from risk import RiskManager
 import pandas as pd
 
-# Load trade history
 trade_history = pd.read_csv('trades.csv')
-
-# Calculate Kelly-optimized position size
 risk_manager = RiskManager(enable_kelly_criterion=True)
-params = risk_manager.get_risk_params(
-    balance=10000,
-    price=100,
-    confidence=0.8,
-    market_type='stock',
-    trade_history=trade_history
-)
 
-print(f"Kelly fraction: {params['kelly_fraction']:.3f}")
-print(f"Recommended size: {params['size']} shares")
+kelly_metrics = risk_manager.get_kelly_metrics(trade_history)
+print(f"Kelly fraction: {kelly_metrics['kelly_fraction']:.3f}")
+print(f"Win rate: {kelly_metrics['win_rate']:.2%}")
+print(f"Win/Loss ratio: {kelly_metrics['win_loss_ratio']:.2f}")
 ```
 
-### Enhanced Sentiment Analysis
+### Shadow Mode Trading
 ```python
-from sentiment import SentimentAnalyzer
+# In config.py
+ADVANCED_FEATURES = {
+    "ENABLE_SHADOW_MODE": True,  # Enable shadow mode
+    # ... other settings
+}
 
-analyzer = SentimentAnalyzer()
-sentiment_score = analyzer.get_combined_sentiment('AAPL')
-breakdown = analyzer.get_sentiment_breakdown('AAPL')
-
-print(f"Combined sentiment: {sentiment_score:.3f}")
-print(f"Source breakdown: {breakdown['sources']}")
+# Run normally - all signals will be logged but no trades executed
+python main.py
 ```
 
-## 🧪 Testing
-
-The bot includes comprehensive test coverage for all advanced features:
+## 🧪 Testing Phase 2 Features
 
 ```bash
-# Run all tests
+# Run comprehensive test suite
 python test_advanced_features.py
 
-# Test specific features
-python -m unittest test_advanced_features.TestKellyCriterion
-python -m unittest test_advanced_features.TestMultiTimeframeStrategy
-python -m unittest test_advanced_features.TestSentimentFusion
+# Test specific Phase 2 features
+python -m unittest test_advanced_features.TestPhase2Features.test_multi_timeframe_confirmation
+python -m unittest test_advanced_features.TestPhase2Features.test_correlation_cap
+python -m unittest test_advanced_features.TestPhase2Features.test_enhanced_trade_logging
 ```
 
-## 📊 Performance Metrics
+## 📊 Dashboard Features
 
-The bot tracks various performance metrics:
+### Phase 2 Analytics
+- **Correlation Heatmap** - Interactive correlation matrix with color coding
+- **Confirmation Status** - Real-time multi-timeframe agreement indicators
+- **Enhanced Trade Log** - Kelly fractions, correlations, and block reasons
+- **Shadow Mode Controls** - Toggle and monitor shadow trading
+- **Kelly Metrics** - Real-time Kelly statistics and performance tracking
 
-- **Sharpe Ratio** - Risk-adjusted returns
-- **Maximum Drawdown** - Largest portfolio decline
-- **Win Rate** - Percentage of profitable trades
-- **Kelly Fraction** - Optimal position sizing
-- **Multi-timeframe Consensus** - Agreement across timeframes
-- **Sentiment Confidence** - Quality of sentiment signals
+### Core Analytics
+- Real-time portfolio performance
+- Multi-timeframe signal visualization
+- Sentiment analysis breakdown
+- Historical trade performance
+- Risk management metrics
 
 ## 🔧 Architecture
 
+### Phase 2 Enhancements
+- **Enhanced Strategy Engine** - Multi-timeframe confirmation logic
+- **Advanced Risk Manager** - Correlation analysis and Kelly enhancements
+- **Improved Trade Logger** - Phase 2 metrics tracking
+- **Upgraded Dashboard** - Advanced analytics and controls
+
 ### Modular Design
 - **data.py** - Multi-timeframe data fetching and alignment
-- **strategy_engine.py** - Multi-timeframe strategy analysis
-- **risk.py** - Kelly criterion and advanced risk management
+- **strategy_engine.py** - Multi-timeframe strategy analysis with confirmation
+- **risk.py** - Kelly criterion and correlation-based risk management
 - **sentiment.py** - Enhanced sentiment data fusion
 - **portfolio.py** - Portfolio management and tracking
 - **execution.py** - Trade execution logic
+- **trade_log.py** - Enhanced logging with Phase 2 metrics
 
 ### Backwards Compatibility
-All new features are designed to be backwards compatible:
-- Multi-timeframe analysis falls back to single timeframe
-- Kelly criterion can be disabled for traditional position sizing
-- Enhanced sentiment maintains original API
+All Phase 2 features are designed to be backwards compatible:
+- Multi-timeframe confirmation can be disabled
+- Correlation capping gracefully handles missing data
+- Kelly criterion falls back to traditional sizing
+- Shadow mode maintains all existing functionality
 
 ## 📝 Trade Logging
 
-The bot maintains detailed logs:
+### Phase 2 Enhanced Logs
+- **trades.csv** - All trades with Kelly fractions and correlation data
+- **trade_reasoning.csv** - Detailed reasoning including confirmation status
+- **performance.csv** - Historical performance with Phase 2 metrics
 
-- **trades.csv** - All executed trades with performance data
-- **trade_reasoning.csv** - Detailed reasoning for each trading decision
-- **performance.csv** - Historical performance metrics
-
-## 🎛️ Dashboard Features
-
-The React-based dashboard provides:
-- Real-time portfolio performance
-- Multi-timeframe signal visualization
-- Kelly criterion metrics
-- Sentiment analysis breakdown
-- Historical trade performance
+### Log Format Examples
+```csv
+date,ticker,action,size,price,strategy,confidence,pnl,kelly_fraction,max_correlation,correlation_blocked
+2024-01-15,AAPL,BUY,100,185.50,multi_tf_rsi,0.82,0,0.125,0.45,False
+2024-01-14,MSFT,BLOCKED,0,300.00,multi_tf_sma,0.75,0,0.15,0.78,True
+```
 
 ## ⚠️ Risk Disclaimer
 
-This trading bot is for educational and research purposes. Past performance does not guarantee future results. Always:
+This trading bot is for educational and research purposes. Phase 2 features provide additional risk management but do not guarantee profits. Always:
 
-- Test thoroughly in simulation mode
+- Test thoroughly in shadow mode before live trading
 - Start with small position sizes
-- Monitor performance closely
+- Monitor correlation limits and Kelly fractions
 - Use proper risk management
 - Never invest more than you can afford to lose
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Phase 2 contributions welcome! Please:
 
 1. Fork the repository
 2. Create a feature branch
-3. Add comprehensive tests
+3. Add comprehensive tests (including Phase 2 test suite)
 4. Update documentation
 5. Submit a pull request
 
@@ -256,4 +319,4 @@ This project is open source. See the LICENSE file for details.
 
 ---
 
-**Happy Trading! 🚀**
+**Happy Trading with Phase 2 Alpha-v2! 🚀**

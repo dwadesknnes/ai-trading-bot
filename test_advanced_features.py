@@ -325,6 +325,140 @@ class TestIntegration(unittest.TestCase):
         self.assertIn('take_profit', old_risk_params)
 
 
+class TestPhase2Features(unittest.TestCase):
+    """Test Phase 2 advanced features."""
+    
+    def setUp(self):
+        """Set up Phase 2 test environment."""
+        self.strategy_engine = StrategyEngine(enable_multi_timeframe=True)
+        self.risk_manager = RiskManager(enable_kelly_criterion=True)
+        
+        # Sample data for testing
+        dates = pd.date_range(start='2023-01-01', periods=50, freq='1D')
+        self.sample_data = pd.DataFrame({
+            'Open': np.random.uniform(100, 110, 50),
+            'High': np.random.uniform(110, 120, 50),
+            'Low': np.random.uniform(90, 100, 50),
+            'Close': np.random.uniform(95, 115, 50),
+            'Volume': np.random.uniform(1000, 10000, 50)
+        }, index=dates)
+        
+        self.trade_history = pd.DataFrame({
+            'date': pd.date_range(start='2023-01-01', periods=30, freq='1D'),
+            'ticker': ['AAPL'] * 30,
+            'action': ['buy'] * 15 + ['sell'] * 15,
+            'quantity': [10] * 30,
+            'price': np.random.uniform(100, 120, 30),
+            'pnl': np.random.normal(0.5, 3, 30)
+        })
+    
+    def test_multi_timeframe_confirmation(self):
+        """Test multi-timeframe confirmation feature."""
+        # Create conflicting signals across timeframes
+        multi_data = {
+            '1d': self.sample_data,  # Will generate some signal
+            '4h': self.sample_data.iloc[-25:],  # Different data subset
+            '1h': self.sample_data.iloc[-10:]   # Shortest timeframe
+        }
+        
+        signal, confidence, strategy = self.strategy_engine.get_multi_timeframe_signal('TEST', multi_data)
+        
+        # Should return valid signal (confirmation may or may not pass)
+        self.assertIn(signal, ['buy', 'sell', 'hold'])
+        self.assertGreaterEqual(confidence, 0)
+        self.assertLessEqual(confidence, 1)
+        self.assertIn('multi_tf', strategy)
+    
+    def test_timeframe_confirmation_logic(self):
+        """Test the confirmation logic directly."""
+        # Mock timeframe signals with agreement
+        agreeing_signals = {
+            '1d': {'signal': 'buy', 'confidence': 0.8, 'weight': 0.5},
+            '4h': {'signal': 'buy', 'confidence': 0.7, 'weight': 0.3}
+        }
+        
+        confirmation = self.strategy_engine._check_timeframe_confirmation(agreeing_signals)
+        self.assertTrue(confirmation['confirmed'])
+        self.assertGreaterEqual(confirmation['agreement_ratio'], 0.6)
+        
+        # Mock conflicting signals
+        conflicting_signals = {
+            '1d': {'signal': 'buy', 'confidence': 0.8, 'weight': 0.5},
+            '4h': {'signal': 'sell', 'confidence': 0.7, 'weight': 0.3}
+        }
+        
+        confirmation = self.strategy_engine._check_timeframe_confirmation(conflicting_signals)
+        # With threshold 0.6 and 50-50 split, should not confirm
+        self.assertFalse(confirmation['confirmed'])
+    
+    def test_correlation_cap(self):
+        """Test correlation capping functionality."""
+        current_positions = {
+            'AAPL': {'qty': 100, 'avg_price': 150},
+            'MSFT': {'qty': 50, 'avg_price': 300}
+        }
+        
+        # Test with high correlation candidate (simplified test)
+        params = self.risk_manager.get_risk_params(
+            balance=10000,
+            price=100,
+            confidence=0.8,
+            market_type='stock',
+            trade_history=self.trade_history,
+            current_positions=current_positions,
+            candidate_ticker='GOOGL'  # Different enough ticker for test
+        )
+        
+        # Should have correlation details
+        self.assertIn('correlation_details', params)
+        self.assertIn('correlation_blocked', params)
+        self.assertIsInstance(params['correlation_blocked'], bool)
+    
+    def test_kelly_cap_enforcement(self):
+        """Test Kelly criterion cap enforcement."""
+        # Create trade history that would suggest high Kelly fraction
+        winning_history = self.trade_history.copy()
+        winning_history['pnl'] = np.abs(winning_history['pnl']) + 1  # All wins
+        
+        kelly_fraction = self.risk_manager.calculate_kelly_criterion(winning_history)
+        
+        # Should be capped at reasonable level
+        self.assertLessEqual(kelly_fraction, 0.25)
+        self.assertGreaterEqual(kelly_fraction, 0)
+    
+    def test_enhanced_trade_logging(self):
+        """Test enhanced trade logging with Phase 2 features."""
+        from trade_log import TradeLog
+        
+        logger = TradeLog()
+        correlation_info = {
+            'max_correlation': 0.65,
+            'blocked': False,
+            'correlations': {'AAPL': 0.65}
+        }
+        
+        logger.log_trade(
+            date='2023-01-01',
+            ticker='MSFT',
+            action='BUY',
+            size=100,
+            price=300,
+            strategy='rsi',
+            confidence=0.8,
+            pnl=0,
+            kelly_fraction=0.15,
+            correlation_info=correlation_info
+        )
+        
+        df = logger.get_df()
+        self.assertEqual(len(df), 1)
+        self.assertIn('kelly_fraction', df.columns)
+        self.assertIn('max_correlation', df.columns)
+        self.assertIn('correlation_blocked', df.columns)
+        self.assertEqual(df.iloc[0]['kelly_fraction'], 0.15)
+        self.assertEqual(df.iloc[0]['max_correlation'], 0.65)
+
+
 def run_tests():
     """Run all tests and return results."""
     # Create test suite
@@ -337,7 +471,8 @@ def run_tests():
         TestMultiTimeframeStrategy, 
         TestKellyCriterion,
         TestSentimentFusion,
-        TestIntegration
+        TestIntegration,
+        TestPhase2Features  # New Phase 2 tests
     ]
     
     for test_class in test_classes:

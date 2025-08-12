@@ -75,6 +75,9 @@ from config import ADVANCED_FEATURES, RISK_DEFAULTS
 
 ENABLE_MULTI_TIMEFRAME = ADVANCED_FEATURES.get("ENABLE_MULTI_TIMEFRAME", True)
 ENABLE_KELLY_CRITERION = ADVANCED_FEATURES.get("ENABLE_KELLY_CRITERION", True)
+ENABLE_SHADOW_MODE = ADVANCED_FEATURES.get("ENABLE_SHADOW_MODE", False)  # Phase 2: Shadow mode
+
+print(f"🔧 Advanced features: Multi-TF={ENABLE_MULTI_TIMEFRAME}, Kelly={ENABLE_KELLY_CRITERION}, Shadow={ENABLE_SHADOW_MODE}")
 
 strategy_engine = StrategyEngine(enable_multi_timeframe=ENABLE_MULTI_TIMEFRAME)
 risk_manager = RiskManager(
@@ -227,13 +230,36 @@ for ticker, market_type in assets_list:
         except Exception as e:
             print(f"Warning: Could not load trade history for Kelly criterion: {e}")
 
+    # Phase 2: Get current positions for correlation check
+    current_positions = portfolio.get_positions()
+
     params = risk_manager.get_risk_params(
         portfolio.capital, 
         price, 
         adj_confidence, 
         market_type,
-        trade_history=trade_history
+        trade_history=trade_history,
+        current_positions=current_positions,
+        candidate_ticker=ticker
     )
+    
+    # Phase 2: Check if trade was blocked by correlation cap
+    if params.get("correlation_blocked", False):
+        correlation_details = params.get("correlation_details", {})
+        print(f"→ BLOCKED by correlation cap: {correlation_details.get('reason', 'Unknown')}")
+        trade_reasoning_logger.log_reason(
+            date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+            ticker=ticker,
+            action="BLOCKED",
+            strategy=strategy,
+            signal=signal,
+            sentiment=sentiment,
+            market_regime=regime,
+            confidence=adj_confidence,
+            notes=f"Correlation blocked: {correlation_details.get('reason', 'Unknown')}"
+        )
+        continue
+    
     position_size = params["size"]
     stop_loss = params["stop_loss"]
     take_profit = params["take_profit"]
@@ -241,6 +267,12 @@ for ticker, market_type in assets_list:
     # Display Kelly information if available
     if params.get("kelly_fraction") is not None:
         print(f"Kelly fraction: {params['kelly_fraction']:.3f}")
+    
+    # Display correlation information if available
+    correlation_details = params.get("correlation_details", {})
+    if correlation_details.get("correlations"):
+        max_corr = correlation_details.get("max_correlation", 0)
+        print(f"Max correlation: {max_corr:.3f} (limit: {risk_manager.max_position_corr})")
 
     allocated = portfolio.allocate(ticker, position_size, price)
     if allocated == 0:
@@ -259,6 +291,37 @@ for ticker, market_type in assets_list:
         continue
 
     print(f"→ {signal.upper()} {allocated:.0f} units @{price:.2f} | Stop: {stop_loss:.2f} | Target: {take_profit:.2f}")
+    
+    # Phase 2: Shadow mode check
+    if ENABLE_SHADOW_MODE:
+        print("🔮 SHADOW MODE: Signal logged but no actual trade executed")
+        trade_reasoning_logger.log_reason(
+            date=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+            ticker=ticker,
+            action=f"SHADOW_{signal.upper()}",
+            strategy=strategy,
+            signal=signal,
+            sentiment=sentiment,
+            market_regime=regime,
+            confidence=adj_confidence,
+            notes="Shadow mode - signal only, no execution"
+        )
+        # Still update portfolio for simulation tracking
+        portfolio.execute_trade(ticker, signal, price, allocated)
+        memory.record_result(ticker, strategy, "win")  # Assume positive for shadow mode
+        trade_logger.log_trade(
+            pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+            ticker,
+            f"SHADOW_{signal.upper()}",
+            allocated,
+            price,
+            strategy,
+            adj_confidence,
+            0,  # No actual PnL in shadow mode
+            kelly_fraction=params.get("kelly_fraction"),
+            correlation_info=params.get("correlation_details")
+        )
+        continue
 
     if MODE == "LIVE" and market_type == "crypto" and allocated > 0:
         if not os.getenv("KRAKEN_API_KEY") or not os.getenv("KRAKEN_SECRET"):
@@ -369,6 +432,8 @@ for ticker, market_type in assets_list:
 
     portfolio.execute_trade(ticker, signal, price, allocated)
     memory.record_result(ticker, strategy, "win")
+    
+    # Phase 2: Enhanced trade logging with Kelly and correlation info
     trade_logger.log_trade(
         pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
         ticker,
@@ -377,7 +442,9 @@ for ticker, market_type in assets_list:
         price,
         strategy,
         adj_confidence,
-        0
+        0,  # PnL will be calculated later
+        kelly_fraction=params.get("kelly_fraction"),
+        correlation_info=params.get("correlation_details")
     )
 
     stats = memory.get_stats(ticker, strategy)

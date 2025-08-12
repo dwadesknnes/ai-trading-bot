@@ -2,7 +2,8 @@
 # Strategy selection engine with confidence scoring and multi-timeframe analysis
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
+import logging
 
 class StrategyEngine:
     def __init__(self, enable_multi_timeframe=True):
@@ -13,6 +14,17 @@ class StrategyEngine:
             '4h': 0.3,    # Intermediate trend
             '1h': 0.2     # Short-term momentum
         }
+        
+        # Phase 2: Multi-timeframe confirmation settings
+        try:
+            from config import ADVANCED_FEATURES
+            self.enable_confirmation = ADVANCED_FEATURES.get("ENABLE_TIMEFRAME_CONFIRMATION", True)
+            self.confirm_timeframes = ADVANCED_FEATURES.get("CONFIRM_TIMEFRAMES", ["1d", "4h"])
+            self.confirm_threshold = ADVANCED_FEATURES.get("CONFIRM_THRESHOLD", 0.6)
+        except ImportError:
+            self.enable_confirmation = True
+            self.confirm_timeframes = ["1d", "4h"]
+            self.confirm_threshold = 0.6
 
     def set_strategy(self, ticker, strategy_name):
         self.strategy_map[ticker] = strategy_name
@@ -35,7 +47,7 @@ class StrategyEngine:
 
     def get_multi_timeframe_signal(self, ticker: str, multi_data: Dict[str, pd.DataFrame]) -> Tuple[str, float, str]:
         """
-        Generate signals using multi-timeframe analysis.
+        Generate signals using multi-timeframe analysis with Phase 2 confirmation.
         
         Args:
             ticker: Asset ticker
@@ -66,10 +78,58 @@ class StrategyEngine:
                 'weight': self.timeframe_weights.get(tf, 0.1)
             }
         
+        # Phase 2: Apply timeframe confirmation
+        if self.enable_confirmation:
+            confirmation_result = self._check_timeframe_confirmation(timeframe_signals)
+            if not confirmation_result['confirmed']:
+                # Log the confirmation failure
+                logging.info(f"Multi-timeframe confirmation failed for {ticker}: {confirmation_result['details']}")
+                return "hold", 0.5, f"multi_tf_{strategy}_unconfirmed"
+        
         # Combine signals using weighted voting
         combined_signal, combined_confidence = self._combine_timeframe_signals(timeframe_signals)
         
         return combined_signal, combined_confidence, f"multi_tf_{strategy}"
+    
+    def _check_timeframe_confirmation(self, timeframe_signals: Dict) -> Dict:
+        """
+        Check if enough timeframes confirm the signal for Phase 2 confirmation.
+        
+        Args:
+            timeframe_signals: Dictionary of timeframe signals
+        
+        Returns:
+            Dict: Confirmation result with details
+        """
+        available_confirm_tfs = [tf for tf in self.confirm_timeframes if tf in timeframe_signals]
+        
+        if len(available_confirm_tfs) < 2:
+            return {
+                'confirmed': True,  # Not enough timeframes for confirmation, allow trade
+                'details': f"Insufficient confirmation timeframes: {available_confirm_tfs}"
+            }
+        
+        # Count agreement between confirmation timeframes
+        signals = [timeframe_signals[tf]['signal'] for tf in available_confirm_tfs]
+        signal_counts = {'buy': 0, 'sell': 0, 'hold': 0}
+        
+        for signal in signals:
+            signal_counts[signal] += 1
+        
+        total_signals = len(signals)
+        max_agreement = max(signal_counts.values())
+        agreement_ratio = max_agreement / total_signals
+        
+        confirmed = agreement_ratio >= self.confirm_threshold
+        
+        return {
+            'confirmed': confirmed,
+            'agreement_ratio': agreement_ratio,
+            'required_threshold': self.confirm_threshold,
+            'signal_counts': signal_counts,
+            'available_timeframes': available_confirm_tfs,
+            'details': f"Agreement: {agreement_ratio:.2f}, Threshold: {self.confirm_threshold}"
+        }
 
     def _combine_timeframe_signals(self, timeframe_signals: Dict) -> Tuple[str, float]:
         """

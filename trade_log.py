@@ -7,8 +7,23 @@ class TradeLog:
     def __init__(self):
         self.trades = []
 
-    def log_trade(self, date, ticker, action, size, price, strategy, confidence, pnl):
-        self.trades.append({
+    def log_trade(self, date, ticker, action, size, price, strategy, confidence, pnl, kelly_fraction=None, correlation_info=None):
+        """
+        Enhanced trade logging with Phase 2 features.
+        
+        Args:
+            date: Trade date
+            ticker: Asset ticker
+            action: Trade action (BUY/SELL/SHADOW_BUY/etc.)
+            size: Position size
+            price: Execution price
+            strategy: Strategy used
+            confidence: Signal confidence
+            pnl: Profit/loss
+            kelly_fraction: Kelly criterion fraction used (Phase 2)
+            correlation_info: Correlation details (Phase 2)
+        """
+        trade_entry = {
             "date": date,
             "ticker": ticker,
             "action": action,
@@ -16,8 +31,12 @@ class TradeLog:
             "price": price,
             "strategy": strategy,
             "confidence": confidence,
-            "pnl": pnl
-        })
+            "pnl": pnl,
+            "kelly_fraction": kelly_fraction,
+            "max_correlation": correlation_info.get("max_correlation") if correlation_info else None,
+            "correlation_blocked": correlation_info.get("blocked", False) if correlation_info else False
+        }
+        self.trades.append(trade_entry)
 
     def get_df(self):
         return pd.DataFrame(self.trades)
@@ -29,7 +48,8 @@ class TradeLog:
             df.to_csv(filename, index=False)
         else:
             pd.DataFrame(columns=[
-                "date", "ticker", "action", "size", "price", "strategy", "confidence", "pnl"
+                "date", "ticker", "action", "size", "price", "strategy", "confidence", "pnl",
+                "kelly_fraction", "max_correlation", "correlation_blocked"  # Phase 2 columns
             ]).to_csv(filename, index=False)
 
     def show(self, n=10):
