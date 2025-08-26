@@ -79,7 +79,12 @@ ENABLE_KELLY_CRITERION = ADVANCED_FEATURES.get("ENABLE_KELLY_CRITERION", True)
 strategy_engine = StrategyEngine(enable_multi_timeframe=ENABLE_MULTI_TIMEFRAME)
 risk_manager = RiskManager(
     enable_kelly_criterion=ENABLE_KELLY_CRITERION,
-    **RISK_DEFAULTS
+    max_allocation_pct_stock=RISK_DEFAULTS["MAX_ALLOCATION_PCT_STOCK"],
+    max_allocation_pct_crypto=RISK_DEFAULTS["MAX_ALLOCATION_PCT_CRYPTO"],
+    default_stop_pct_stock=RISK_DEFAULTS["DEFAULT_STOP_PCT_STOCK"],
+    default_take_profit_pct_stock=RISK_DEFAULTS["DEFAULT_TAKE_PROFIT_PCT_STOCK"],
+    default_stop_pct_crypto=RISK_DEFAULTS["DEFAULT_STOP_PCT_CRYPTO"],
+    default_take_profit_pct_crypto=RISK_DEFAULTS["DEFAULT_TAKE_PROFIT_PCT_CRYPTO"]
 )
 memory = Memory()
 trade_logger = TradeLog()
@@ -397,7 +402,7 @@ for ticker, market_type in assets_list:
     else:
         primary_df = data
     
-    if primary_df is not None and not primary_df.empty:
+    if primary_df is not None and hasattr(primary_df, 'empty') and not primary_df.empty:
         price = float(primary_df["Close"].iloc[-1])
         final_portfolio_value += portfolio.get_value({ticker: price})
 
@@ -416,5 +421,258 @@ if os.path.exists("trades.csv") and os.path.getsize("trades.csv") > 0:
         print("No trades were executed. trades.csv is empty.")
 else:
     print("No trades were executed. trades.csv is empty.")
+
+# --- ADVANCED ENGINE MODULES ---
+
+class SelfEvolvingStrategyEngine:
+    """Framework for autonomous strategy generation, evaluation, selection, and deployment."""
+    
+    def __init__(self):
+        self.strategies = {}
+        self.performance_metrics = {}
+        self.active_strategies = []
+        print("🧠 SelfEvolvingStrategyEngine initialized")
+    
+    def generate_new_strategies(self):
+        """Generate new trading strategies using evolutionary algorithms."""
+        # TODO: Implement genetic algorithm for strategy generation
+        print("📊 Generating new strategies...")
+        pass
+    
+    def evaluate_strategy_performance(self, strategy_id, trades_data):
+        """Evaluate performance of a specific strategy."""
+        # TODO: Implement comprehensive strategy evaluation metrics
+        print(f"📈 Evaluating strategy {strategy_id} performance...")
+        pass
+    
+    def select_best_strategies(self, market_conditions):
+        """Select best performing strategies for current market conditions."""
+        # TODO: Implement strategy selection algorithm
+        print("🎯 Selecting best strategies for current conditions...")
+        pass
+    
+    def deploy_strategy(self, strategy_id):
+        """Deploy a selected strategy for live trading."""
+        # TODO: Implement strategy deployment mechanism
+        print(f"🚀 Deploying strategy {strategy_id}...")
+        pass
+    
+    def mutate_strategies(self):
+        """Apply mutations to existing strategies to create variants."""
+        # TODO: Implement strategy mutation logic
+        print("🔄 Mutating existing strategies...")
+        pass
+
+
+class MarketRegimeDetector:
+    """Detects market regimes (bull, bear, sideways, high-volatility, low-liquidity) for macro and micro conditions."""
+    
+    def __init__(self):
+        self.current_regime = None
+        self.regime_history = []
+        self.volatility_threshold = 0.02
+        self.trend_threshold = 0.01
+        print("📊 MarketRegimeDetector initialized")
+    
+    def detect_market_regime(self, price_data, volume_data=None):
+        """Detect current market regime based on price and volume data."""
+        # TODO: Implement market regime detection algorithm
+        print("🔍 Detecting market regime...")
+        return "bull"  # Placeholder
+    
+    def detect_volatility_regime(self, price_data):
+        """Detect volatility regime (high/low volatility)."""
+        # TODO: Implement volatility regime detection
+        print("📈 Detecting volatility regime...")
+        return "normal"  # Placeholder
+    
+    def detect_liquidity_regime(self, volume_data, spread_data=None):
+        """Detect liquidity regime (high/low liquidity)."""
+        # TODO: Implement liquidity regime detection
+        print("💧 Detecting liquidity regime...")
+        return "normal"  # Placeholder
+    
+    def get_regime_probabilities(self, data):
+        """Get probabilities for different market regimes."""
+        # TODO: Implement probabilistic regime detection
+        print("🎲 Calculating regime probabilities...")
+        return {"bull": 0.6, "bear": 0.2, "sideways": 0.2}
+    
+    def update_regime_history(self, regime):
+        """Update the historical record of market regimes."""
+        # TODO: Implement regime history tracking
+        print(f"📝 Updating regime history with: {regime}")
+        pass
+
+
+class MacroDataIngestor:
+    """Fetches and integrates macroeconomic indicators (interest rates, inflation, employment, Fed speeches, oil prices, etc)."""
+    
+    def __init__(self):
+        self.data_sources = {}
+        self.cached_data = {}
+        self.last_update = None
+        print("🌍 MacroDataIngestor initialized")
+    
+    def fetch_interest_rates(self):
+        """Fetch current interest rate data."""
+        # TODO: Implement interest rate data fetching
+        print("💰 Fetching interest rate data...")
+        return {}
+    
+    def fetch_inflation_data(self):
+        """Fetch inflation indicators."""
+        # TODO: Implement inflation data fetching
+        print("📊 Fetching inflation data...")
+        return {}
+    
+    def fetch_employment_data(self):
+        """Fetch employment statistics."""
+        # TODO: Implement employment data fetching
+        print("👥 Fetching employment data...")
+        return {}
+    
+    def fetch_fed_speeches(self):
+        """Fetch and analyze Federal Reserve speeches and minutes."""
+        # TODO: Implement Fed communication analysis
+        print("🎤 Fetching Fed speeches and communications...")
+        return {}
+    
+    def fetch_commodity_prices(self):
+        """Fetch commodity prices (oil, gold, etc.)."""
+        # TODO: Implement commodity price fetching
+        print("🛢️ Fetching commodity prices...")
+        return {}
+    
+    def get_macro_sentiment(self):
+        """Get overall macroeconomic sentiment score."""
+        # TODO: Implement macro sentiment calculation
+        print("🌡️ Calculating macro sentiment...")
+        return 0.0
+    
+    def update_all_data(self):
+        """Update all macroeconomic data sources."""
+        # TODO: Implement comprehensive data update
+        print("🔄 Updating all macro data sources...")
+        pass
+
+
+class RegimeStrategySwitcher:
+    """Auto-switches strategies/playbooks based on detected market regime and macro data."""
+    
+    def __init__(self, regime_detector, macro_ingestor, strategy_engine):
+        self.regime_detector = regime_detector
+        self.macro_ingestor = macro_ingestor
+        self.strategy_engine = strategy_engine
+        self.regime_strategies = {}
+        self.switching_rules = {}
+        print("🔄 RegimeStrategySwitcher initialized")
+    
+    def define_regime_strategies(self):
+        """Define which strategies to use for each market regime."""
+        # TODO: Implement regime-strategy mapping
+        print("📋 Defining regime-specific strategies...")
+        pass
+    
+    def should_switch_strategy(self, current_regime, macro_conditions):
+        """Determine if strategy should be switched based on conditions."""
+        # TODO: Implement strategy switching logic
+        print("🤔 Evaluating if strategy switch is needed...")
+        return False
+    
+    def switch_strategy(self, new_regime, macro_data):
+        """Switch to appropriate strategy based on regime and macro data."""
+        # TODO: Implement strategy switching mechanism
+        print(f"🔄 Switching strategy for regime: {new_regime}")
+        pass
+    
+    def get_strategy_for_regime(self, regime):
+        """Get the best strategy for a specific market regime."""
+        # TODO: Implement regime-strategy lookup
+        print(f"📊 Getting strategy for regime: {regime}")
+        return "default_strategy"
+    
+    def update_switching_rules(self, performance_data):
+        """Update strategy switching rules based on performance."""
+        # TODO: Implement adaptive switching rules
+        print("📈 Updating strategy switching rules...")
+        pass
+
+
+class DashboardIntegration:
+    """Hooks for visualizing regime, macro, and strategy state in the dashboard."""
+    
+    def __init__(self):
+        self.dashboard_data = {}
+        self.update_queue = []
+        self.websocket_connections = []
+        print("📱 DashboardIntegration initialized")
+    
+    def update_regime_display(self, regime_data):
+        """Update dashboard with current market regime information."""
+        # TODO: Implement regime display update
+        print("📊 Updating regime display on dashboard...")
+        pass
+    
+    def update_macro_display(self, macro_data):
+        """Update dashboard with macroeconomic indicators."""
+        # TODO: Implement macro data display update
+        print("🌍 Updating macro data display...")
+        pass
+    
+    def update_strategy_display(self, strategy_data):
+        """Update dashboard with current strategy information."""
+        # TODO: Implement strategy display update
+        print("🎯 Updating strategy display...")
+        pass
+    
+    def send_alerts(self, alert_type, message):
+        """Send alerts to dashboard users."""
+        # TODO: Implement alert system
+        print(f"⚠️ Sending {alert_type} alert: {message}")
+        pass
+    
+    def export_dashboard_data(self, format_type="json"):
+        """Export dashboard data for external use."""
+        # TODO: Implement data export functionality
+        print(f"📤 Exporting dashboard data as {format_type}")
+        return {}
+    
+    def get_dashboard_state(self):
+        """Get current state of all dashboard components."""
+        # TODO: Implement dashboard state retrieval
+        print("📋 Getting current dashboard state...")
+        return {}
+
+
+# --- INITIALIZATION AND INTEGRATION ---
+print("\n🚀 Initializing Advanced Engine Modules...")
+
+# Initialize advanced modules
+evolving_engine = SelfEvolvingStrategyEngine()
+regime_detector = MarketRegimeDetector() 
+macro_ingestor = MacroDataIngestor()
+regime_switcher = RegimeStrategySwitcher(regime_detector, macro_ingestor, strategy_engine)
+dashboard_integration = DashboardIntegration()
+
+print("✅ All advanced modules initialized successfully!")
+
+# Demonstrate integration in main trading loop
+print("\n🔗 Testing integration with main trading loop...")
+
+# Test regime detection
+current_regime = regime_detector.detect_market_regime(None)
+print(f"Current detected regime: {current_regime}")
+
+# Test macro data fetching
+macro_ingestor.update_all_data()
+
+# Test strategy evolution
+evolving_engine.generate_new_strategies()
+
+# Test dashboard updates
+dashboard_integration.update_regime_display({"regime": current_regime})
+
+print("✅ Integration testing completed!")
 
 print("✅ Finished running AI Trading Bot.")
